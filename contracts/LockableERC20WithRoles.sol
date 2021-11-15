@@ -30,7 +30,12 @@ contract LockableERC20WithRoles is ERC20Burnable {
         _;
     }
 
-    modifier checkLock(uint256 amount) {
+    modifier checkLock(address from, uint256 amount) {
+        if (address(0) == from) {
+            _;
+            return;
+        }
+
         TokenLock memory userLock = ownerToLock[msg.sender];
 
         uint256 lockAmount = userLock.amount;
@@ -117,35 +122,9 @@ contract LockableERC20WithRoles is ERC20Burnable {
         _mint(account, amount);
     }
 
-    function _transfer(address recipient, uint256 amount)
-        public
-        checkLock(amount)
-    {
-        transfer(recipient, amount);
-    }
-
-    function _transferFrom(
-        address sender,
-        address recipient,
-        uint256 amount
-    ) public checkLock(amount) {
-        transferFrom(sender, recipient, amount);
-    }
-
-    function _burn(uint256 amount) public checkLock(amount) {
-        burn(amount);
-    }
-
-    function _burnFrom(address account, uint256 amount)
-        public
-        checkLock(amount)
-    {
-        burnFrom(account, amount);
-    }
-
     function _beforeTokenTransfer(
         address from,
         address to,
         uint256 amount
-    ) internal virtual override checkLock(amount) {}
+    ) internal virtual override checkLock(from, amount) {}
 }

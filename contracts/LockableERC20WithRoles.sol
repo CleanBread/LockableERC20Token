@@ -7,16 +7,13 @@ contract LockableERC20WithRoles is ERC20Burnable {
     struct TokenLock {
         uint256 amount;
         uint32 readyTime;
-        address owner;
     }
-
-    TokenLock[] public tokenLockes;
 
     mapping(address => bool) private superUsers;
     mapping(address => bool) private minters;
     mapping(address => bool) private lockers;
 
-    mapping(address => uint256) public ownerToLock;
+    mapping(address => TokenLock) public ownerToLock;
 
     modifier onlySuperUser() {
         require(superUsers[msg.sender], "Only for super user");
@@ -34,19 +31,13 @@ contract LockableERC20WithRoles is ERC20Burnable {
     }
 
     modifier checkLock(uint256 amount) {
-        uint256 lockId = ownerToLock[msg.sender];
-        TokenLock memory tokenLock = tokenLockes[lockId];
+        TokenLock memory userLock = ownerToLock[msg.sender];
 
-        if (tokenLock.owner != msg.sender) {
-            _;
-        }
-
-        uint256 lockAmount = tokenLock.amount;
+        uint256 lockAmount = userLock.amount;
         uint256 userBalance = balanceOf(msg.sender);
         uint256 availableBalance = userBalance - lockAmount;
         require(
-            availableBalance >= amount ||
-                tokenLock.readyTime <= block.timestamp,
+            availableBalance >= amount || userLock.readyTime <= block.timestamp,
             "Amount greater then available balance"
         );
         _;
@@ -96,12 +87,10 @@ contract LockableERC20WithRoles is ERC20Burnable {
     function getLockValue(address _who) public view returns (uint256) {
         require(address(0) != _who, "Lock for zero address");
 
-        uint256 lockId = ownerToLock[_who];
-        TokenLock memory tokenLock = tokenLockes[lockId];
-        if (_who == tokenLock.owner && tokenLock.readyTime > block.timestamp) {
-            return tokenLock.amount;
+        TokenLock memory userLock = ownerToLock[_who];
+        if (userLock.readyTime > block.timestamp) {
+            return userLock.amount;
         }
-
         return 0;
     }
 
@@ -118,18 +107,10 @@ contract LockableERC20WithRoles is ERC20Burnable {
 
         TokenLock memory tokenLock = TokenLock(
             _amount,
-            uint32(block.timestamp + _time),
-            _who
+            uint32(block.timestamp + _time)
         );
-        uint256 lockId = ownerToLock[_who];
 
-        if (tokenLockes.length > 0 && tokenLockes[lockId].owner == _who) {
-            tokenLockes[lockId] = tokenLock;
-        } else {
-            tokenLockes.push(tokenLock);
-            uint256 id = tokenLockes.length - 1;
-            ownerToLock[_who] = id;
-        }
+        ownerToLock[_who] = tokenLock;
     }
 
     function mint(address account, uint256 amount) public onlyMinter {
@@ -161,4 +142,10 @@ contract LockableERC20WithRoles is ERC20Burnable {
     {
         burnFrom(account, amount);
     }
+
+    function _beforeTokenTransfer(
+        address from,
+        address to,
+        uint256 amount
+    ) internal virtual override checkLock(amount) {}
 }

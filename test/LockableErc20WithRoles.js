@@ -14,7 +14,7 @@ contract('LockableERC20WithRoles', ([alice, bob, cale]) => {
     });
   });
 
-  context('text lock', () => {
+  context('test lock', () => {
     it('should be able to lock only for locker role', async () => {
       await contractInstance.setLockerRole(bob, true, { from: alice });
       await contractInstance.setMinterRole(alice, true, { from: alice });
@@ -44,7 +44,7 @@ contract('LockableERC20WithRoles', ([alice, bob, cale]) => {
       });
 
       await expectRevert(
-        contractInstance._burn(ONE, { from: alice }),
+        contractInstance.burn(ONE, { from: alice }),
         'Amount greater then available balance',
       );
     });
@@ -56,7 +56,7 @@ contract('LockableERC20WithRoles', ([alice, bob, cale]) => {
       await contractInstance.lock(alice, ONE, DAY, {
         from: bob,
       });
-      await contractInstance._burn(ONE, { from: alice });
+      await contractInstance.burn(ONE, { from: alice });
       const aliceBalance = await contractInstance.balanceOf(alice);
 
       expect(aliceBalance).bignumber.equal(TWO.sub(ONE));
@@ -70,7 +70,7 @@ contract('LockableERC20WithRoles', ([alice, bob, cale]) => {
         from: bob,
       });
       await time.increase(DAY);
-      await contractInstance._burn(TWO, { from: alice });
+      await contractInstance.burn(TWO, { from: alice });
       const aliceBalance = await contractInstance.balanceOf(alice);
 
       expect(aliceBalance).bignumber.equal(new BN(0));

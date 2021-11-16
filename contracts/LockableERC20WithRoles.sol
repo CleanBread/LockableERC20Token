@@ -1,34 +1,22 @@
 pragma solidity >=0.8.0;
 
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
-import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/access/AccessControl.sol";
 
-contract LockableERC20WithRoles is ERC20Burnable {
+contract LockableERC20WithRoles is ERC20Burnable, AccessControl {
     struct TokenLock {
         uint256 amount;
         uint32 readyTime;
     }
 
-    mapping(address => bool) private superUsers;
+    bytes32 public constant SUPER_USER_ROLE = keccak256("SUPER_USER_ROLE");
+    bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
+    bytes32 public constant LOCKER_ROLE = keccak256("LOCKER_ROLE");
+
     mapping(address => bool) private minters;
     mapping(address => bool) private lockers;
 
     mapping(address => TokenLock) public ownerToLock;
-
-    modifier onlySuperUser() {
-        require(superUsers[msg.sender], "Only for super user");
-        _;
-    }
-
-    modifier onlyMinter() {
-        require(minters[msg.sender], "Only for minter");
-        _;
-    }
-
-    modifier onlyLocker() {
-        require(lockers[msg.sender], "Only for locker");
-        _;
-    }
 
     modifier checkLock(address from, uint256 amount) {
         if (address(0) == from) {
@@ -49,44 +37,18 @@ contract LockableERC20WithRoles is ERC20Burnable {
     }
 
     constructor() ERC20("ERC20WithRoles", "EWR") {
-        superUsers[msg.sender] = true;
-    }
+        _setupRole(SUPER_USER_ROLE, msg.sender);
+        _setRoleAdmin(SUPER_USER_ROLE, SUPER_USER_ROLE);
 
-    function isSuperUser(address _who) public view returns (bool) {
-        require(address(0) != _who, "isSuperUser for zero address");
-        return superUsers[_who];
-    }
+        _setupRole(MINTER_ROLE, msg.sender);
+        _setRoleAdmin(MINTER_ROLE, SUPER_USER_ROLE);
 
-    function isMinter(address _who) public view returns (bool) {
-        require(address(0) != _who, "isMinter for zero address");
-        return minters[_who];
-    }
-
-    function isLocker(address _who) public view returns (bool) {
-        require(address(0) != _who, "isLocker for zero address");
-        return lockers[_who];
+        _setupRole(LOCKER_ROLE, msg.sender);
+        _setRoleAdmin(LOCKER_ROLE, SUPER_USER_ROLE);
     }
 
     function decimals() public pure override returns (uint8) {
         return 10;
-    }
-
-    function setSuperUserRole(address _who, bool _value) public onlySuperUser {
-        require(address(0) != _who, "Role superUser for zero address");
-        require(superUsers[_who] != _value, "Same super user value in storage");
-        superUsers[_who] = _value;
-    }
-
-    function setMinterRole(address _who, bool _value) public onlySuperUser {
-        require(address(0) != _who, "Role minter for zero address");
-        require(minters[_who] != _value, "Same minter value in storage");
-        minters[_who] = _value;
-    }
-
-    function setLockerRole(address _who, bool _value) public onlySuperUser {
-        require(address(0) != _who, "Role locker for zero address");
-        require(lockers[_who] != _value, "Same locker value in storage");
-        lockers[_who] = _value;
     }
 
     function getLockValue(address _who) public view returns (uint256) {
@@ -103,7 +65,7 @@ contract LockableERC20WithRoles is ERC20Burnable {
         address _who,
         uint256 _amount,
         uint256 _time
-    ) public onlyLocker {
+    ) public onlyRole(LOCKER_ROLE) {
         require(address(0) != _who, "Lock for zero address");
         require(_amount > 0, "Lock for zero amount");
 
@@ -118,7 +80,10 @@ contract LockableERC20WithRoles is ERC20Burnable {
         ownerToLock[_who] = tokenLock;
     }
 
-    function mint(address account, uint256 amount) public onlyMinter {
+    function mint(address account, uint256 amount)
+        public
+        onlyRole(MINTER_ROLE)
+    {
         _mint(account, amount);
     }
 
